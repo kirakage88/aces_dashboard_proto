@@ -4,19 +4,32 @@ A centralized dashboard for the Association of the College of Engineering Studen
 
 ## Reference Code
 
-The `reference/` folder contains the original Google Sheets Canvas prototype:
+The `reference/` folder contains two types of reference material:
+
+### Canvas App Prototypes (UI/UX reference)
 
 | File | Description |
 |---|---|
-| `reference/ACES Project Dashboard` | Complete Canvas app code — React + dnd-kit Kanban, D3.js donut chart, calendar view, clipboard link navigation. Built in AppSheet Canvas but serves as the feature reference for the custom React build. |
+| `reference/ACES Project Dashboard` | Canvas app #1 — React + dnd-kit Kanban, D3.js donut chart, calendar view, clipboard link navigation. Main project management interface. |
+| `reference/ACES Ledger Dashboard` | Canvas app #2 — React financial ledger with D3.js rollups, summary cards, transaction CRUD modal, project/account filters, month navigation. |
 
 **Key features to re-implement from Canvas:**
 - 4-tab navigation (Home, Projects/Kanban, Overview/Charts, Calendar)
 - Drag-and-drop Kanban board for project status tracking
-- D3.js budget allocation donut chart
+- D3.js budget allocation donut chart + bar chart distribution
 - Calendar with unscheduled projects panel
-- Modal form for adding/editing projects
+- Modal form for adding/editing projects and transactions
 - Clipboard-based Google resource linking (Ledger, Drive, Files)
+- Ledger-style transaction table with inline editing and filtering
+
+### Sample Data (CSV)
+
+| File | Description |
+|---|---|
+| `reference/project_reference.csv` | Project Tracker sample data — columns: Project Code, Name, Head, Area Focus, Date, Status, Budget |
+| `reference/ledger_reference.csv` | Ledger sample data — columns: Date, Entry ID, Type, Description, Debit, Credit, Account, Project ID, Filing Status |
+
+These CSVs serve as the **data contract** — the dashboard must be able to consume both structures. Use them to seed the app during development and to validate parsing/filtering logic.
 
 ## Architecture
 
