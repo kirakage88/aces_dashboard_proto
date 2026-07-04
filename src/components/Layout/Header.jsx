@@ -37,7 +37,7 @@ export default function Header({ activeTab, onTabChange }) {
 
   return (
     <header className="bg-white border-b border-slate-100 sticky top-0 z-[60]">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-3 md:py-5 flex items-center justify-between lg:grid lg:grid-cols-3">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-3 md:py-5 grid grid-cols-2 lg:grid-cols-3 items-center">
         <div
           className="flex items-center gap-2 md:gap-4 group cursor-pointer"
           onClick={() => handleTabClick('home')}
@@ -56,7 +56,7 @@ export default function Header({ activeTab, onTabChange }) {
           </div>
         </div>
 
-        <nav className="hidden lg:flex items-center bg-slate-100/50 p-1 rounded-2xl border border-slate-200/40">
+        <nav className="hidden lg:flex items-center bg-slate-100/50 p-1 rounded-2xl border border-slate-200/40 justify-self-center">
           {TABS.map((tab) => {
             const Icon = TAB_ICONS[tab.id];
             return (
