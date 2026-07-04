@@ -36,8 +36,8 @@ export default function Header({ activeTab, onTabChange }) {
   };
 
   return (
-    <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-[60]">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-3 md:py-5 flex items-center justify-between">
+    <header className="bg-white lg:bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-[60]">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-3 md:py-5 flex items-center justify-between lg:grid lg:grid-cols-3">
         <div
           className="flex items-center gap-2 md:gap-4 group cursor-pointer"
           onClick={() => handleTabClick('home')}
