@@ -31,11 +31,15 @@
 - Transaction CRUD modal with all fields from the ledger CSV schema
 - Month navigation that reads/updates metadata from Sheet header rows
 
-## Phase 4 — Polish & Deploy
+## Phase 4 — Deploy ✅
+
+- `npm run build` → `npm run deploy` (`gh-pages`)
+- Deployed to: `https://kirakage88.github.io/aces_dashboard_proto/`
+
+## Recommended (future phases)
 
 - Dark mode toggle
 - Mobile responsive layout
-- `npm run build` → `npm run deploy` (`gh-pages`)
 
 ---
 
