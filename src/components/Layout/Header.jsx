@@ -76,7 +76,7 @@ export default function Header({ activeTab, onTabChange }) {
         </nav>
 
         <button
-          className="lg:hidden p-2.5 hover:bg-slate-100 rounded-xl transition-all text-slate-600"
+          className="lg:hidden p-2.5 hover:bg-slate-100 rounded-xl transition-all text-slate-600 justify-self-end"
           onClick={() => setMobileMenuOpen(true)}
           aria-label="Open menu"
         >
