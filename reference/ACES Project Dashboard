@@ -1,0 +1,730 @@
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import * as dndKit from '@dnd-kit/core';
+import * as dndKitSortable from '@dnd-kit/sortable';
+import * as dndKitUtils from '@dnd-kit/utilities';
+import ReactDOM from 'react-dom';
+import { 
+  LayoutDashboard, 
+  Kanban as KanbanIcon, 
+  BarChart3, 
+  ExternalLink, 
+  FolderOpen, 
+  FileText, 
+  User, 
+  Calendar, 
+  Plus, 
+  Trash2, 
+  Edit3,
+  X,
+  PieChart as PieChartIcon,
+  Search,
+  CheckCircle2,
+  Copy,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle
+} from 'lucide-react';
+import * as d3 from 'd3';
+
+/**
+ * ACES AUDIT DASHBOARD - High-Fidelity Mini App
+ * - Modern Gradient Homepage (Clean Title Only)
+ * - Link navigation engineered for Sheets Canvas via followLink()
+ * - Secure Clipboard copy fallback
+ * - Kanban Management (excluding Review phase)
+ * - D3.js Visualization with "Budget Allocation" View
+ * - Premium Interactive Calendar & Unscheduled Project Planner
+ */
+
+const THEME = {
+  primary: '#550000',
+  accent: '#efbf04',
+  text: '#1a1a1a',
+  bg: '#f8fafc'
+};
+
+const CHART_COLORS = [
+  '#550000', '#efbf04', '#800000', '#D4AF37', '#600000', 
+  '#B8860B', '#a52a2a', '#DAA520', '#4A0000', '#FFD700'
+];
+
+const EXTERNAL_RESOURCES = {
+  LEDGER: "https://docs.google.com/spreadsheets/d/1lBy3Jo8pG8P4iGdpPJBodfkXnBNy3z3GQmFJlwHbQhI/edit?gid=109249955#gid=109249955",
+  DRIVE: "https://drive.google.com/drive/folders/170CfFQRYo1lVpTcW0V6mjSq51yJNLw7r?usp=sharing",
+  FILES: "https://docs.google.com/spreadsheets/d/11YNPckLE7vln3BKwEBX7NP22VnEyng_HAOWu5dYWOpw/edit?gid=0#gid=0"
+};
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+// --- Utils ---
+const parseCurrency = (val) => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  return Number(String(val).replace(/[^\d.-]/g, '')) || 0;
+};
+
+const getStatusStyle = (status) => {
+  const s = String(status || "").toLowerCase();
+  if (s.includes('not started')) return { color: '#94a3b8', bg: '#f1f5f9' };
+  if (s.includes('in progress')) return { color: THEME.accent, bg: '#fefce8' };
+  if (s.includes('completed') || s.includes('done')) return { color: '#10b981', bg: '#ecfdf5' };
+  if (s.includes('review') || s.includes('audit') || s.includes('post-docs')) return { color: THEME.primary, bg: '#fff1f2' };
+  return { color: '#64748b', bg: '#f8fafc' };
+};
+
+// --- Components ---
+const StatusBadge = ({ status }) => {
+  const style = getStatusStyle(status);
+  return (
+    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider" 
+         style={{ backgroundColor: style.bg, color: style.color }}>
+      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: style.color }}></div>
+      {status}
+    </div>
+  );
+};
+
+const D3Donut = ({ data }) => {
+  const ref = useRef();
+  useEffect(() => {
+    if (!ref.current || !data.length) return;
+    const width = 260, height = 260, margin = 20;
+    const radius = Math.min(width, height) / 2 - margin;
+    
+    d3.select(ref.current).selectAll("*").remove();
+    const svg = d3.select(ref.current)
+      .append("svg")
+      .attr("viewBox", `0 0 ${width} ${height}`)
+      .append("g")
+      .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+    const pie = d3.pie().value(d => d.budget).sort(null);
+    const arc = d3.arc().innerRadius(radius * 0.6).outerRadius(radius * 0.95).cornerRadius(6);
+    const color = d3.scaleOrdinal().range(CHART_COLORS);
+
+    const total = d3.sum(data, d => d.budget);
+
+    svg.selectAll('path')
+      .data(pie(data))
+      .enter()
+      .append('path')
+      .attr('d', arc)
+      .attr('fill', (d, i) => color(i))
+      .attr('stroke', 'white')
+      .attr('stroke-width', 3)
+      .style('cursor', 'pointer')
+      .on('mouseenter', function() { d3.select(this).transition().duration(200).attr('d', d3.arc().innerRadius(radius * 0.55).outerRadius(radius * 1.05).cornerRadius(8)); })
+      .on('mouseleave', function() { d3.select(this).transition().duration(200).attr('d', arc); });
+
+    svg.append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "-0.1em")
+      .style("font-size", "22px")
+      .style("font-weight", "900")
+      .style("fill", THEME.primary)
+      .text(`₱${total > 999 ? (total / 1000).toFixed(1) + 'k' : total}`);
+
+    svg.append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "1.5em")
+      .style("font-size", "10px")
+      .style("font-weight", "800")
+      .style("fill", "#64748b")
+      .style("text-transform", "uppercase")
+      .text("Total Budget");
+
+  }, [data]);
+
+  return <div ref={ref} className="w-full max-w-[260px] mx-auto" />;
+};
+
+const DroppableZone = ({ id, children }) => {
+  const { setNodeRef } = dndKit.useDroppable({ id });
+  return <div ref={setNodeRef} className="flex-1 px-4 pb-6 overflow-y-auto scrollbar-hide">{children}</div>;
+};
+
+const SortableItem = ({ id, project, onEdit, onDelete }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = dndKitSortable.useSortable({ id });
+  const style = { transform: dndKitUtils.CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.3 : 1, zIndex: isDragging ? 50 : 1 };
+
+  return (
+    <div ref={setNodeRef} style={style} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm mb-4 group hover:shadow-xl hover:shadow-[#550000]/5 transition-all duration-300">
+      <div className="flex justify-between items-start mb-3" {...attributes} {...listeners}>
+        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-full">{project.id || 'N/A'}</span>
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+           <button onClick={(e) => { e.stopPropagation(); onEdit(project); }} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600 transition-colors"><Edit3 size={14}/></button>
+           <button onClick={(e) => { e.stopPropagation(); onDelete(project.index_); }} className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
+        </div>
+      </div>
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+        <h4 className="font-black text-slate-900 leading-tight mb-3 text-sm pr-4">{project.name}</h4>
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center gap-2 text-[11px] font-bold text-[#550000]">
+            <div className="p-1.5 bg-[#550000]/5 rounded-lg"><User size={12} /></div>
+            <span className="truncate">{project.head || "No Lead Assigned"}</span>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">
+            <div className="p-1.5 bg-slate-50 rounded-lg"><Calendar size={12} /></div>
+            <span>{project.date || "Unscheduled"}</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+          <div className="text-[10px] font-black text-[#efbf04]">₱{parseCurrency(project.budget).toLocaleString()}</div>
+          <StatusBadge status={project.status} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main App Component ---
+function App({ data, updateItem, deleteItem, insertItem, moveItem, followLink }) {
+  const [activeTab, setActiveTab] = useState('home'); 
+  const [activeDragId, setActiveDragId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [copiedKey, setCopiedKey] = useState(null);
+
+  // Calendar State Management
+  const [calendarDate, setCalendarDate] = useState(new Date());
+
+  const projects = useMemo(() => {
+    if (!data || data.length <= 1) return [];
+    return data.slice(1)
+      .filter(row => row.row[1] || row.row[3]) // Name or focus must exist
+      .map(row => ({
+        index_: row.index_,
+        id: row.row[0],
+        name: row.row[1] || "Untitled Project",
+        head: row.row[2],
+        focus: row.row[3],
+        date: row.row[4],
+        status: row.row[5] || "Not Started",
+        budget: parseCurrency(row.row[7]),
+        notes: row.row[8]
+      }));
+  }, [data]);
+
+  const stats = useMemo(() => {
+    const focusMap = {};
+    projects.forEach(p => {
+      if (p.focus && String(p.focus).toLowerCase() !== "uncategorized") {
+        if (!focusMap[p.focus]) focusMap[p.focus] = { focus: p.focus, count: 0, budget: 0 };
+        focusMap[p.focus].count++;
+        focusMap[p.focus].budget += p.budget;
+      }
+    });
+    return Object.values(focusMap).sort((a, b) => b.budget - a.budget);
+  }, [projects]);
+
+  const kanbanBoard = useMemo(() => {
+    // Removed "Review" from columns to simplify active project pipeline
+    const cols = ["Not Started", "In Progress", "Post-Docs", "Done"];
+    const board = {};
+    cols.forEach(c => board[c] = []);
+    projects.forEach(p => {
+      const status = cols.includes(p.status) ? p.status : "Not Started";
+      board[status].push(p);
+    });
+    return { columns: cols, board };
+  }, [projects]);
+
+  // Calendar calculations
+  const year = calendarDate.getFullYear();
+  const month = calendarDate.getMonth();
+
+  const daysInMonth = useMemo(() => new Date(year, month + 1, 0).getDate(), [year, month]);
+  const firstDayOfMonth = useMemo(() => new Date(year, month, 1).getDay(), [year, month]);
+
+  const projectsWithDates = useMemo(() => {
+    return projects.map(p => {
+      let parsedDate = null;
+      if (p.date) {
+        const str = String(p.date).trim();
+        const parts = str.split('/');
+        if (parts.length === 3) {
+          const [m, d, y] = parts.map(v => parseInt(v, 10));
+          parsedDate = new Date(y, m - 1, d);
+        } else {
+          const d = new Date(str);
+          if (!isNaN(d.getTime())) parsedDate = d;
+        }
+      }
+      return { ...p, parsedDate };
+    });
+  }, [projects]);
+
+  const unscheduledProjects = useMemo(() => {
+    return projectsWithDates.filter(p => !p.parsedDate);
+  }, [projectsWithDates]);
+
+  const getProjectsForDay = (dayNum) => {
+    return projectsWithDates.filter(p => {
+      if (!p.parsedDate) return false;
+      return p.parsedDate.getDate() === dayNum && 
+             p.parsedDate.getMonth() === month && 
+             p.parsedDate.getFullYear() === year;
+    });
+  };
+
+  const handlePrevMonth = () => {
+    setCalendarDate(new Date(year, month - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCalendarDate(new Date(year, month + 1, 1));
+  };
+
+  const handleDayClick = (dayNum) => {
+    const formattedMonth = String(month + 1).padStart(2, '0');
+    const formattedDay = String(dayNum).padStart(2, '0');
+    const selectedDateString = `${year}-${formattedMonth}-${formattedDay}`;
+    setEditingItem({ date: selectedDateString });
+    setIsModalOpen(true);
+  };
+
+  // Secure copy execution logic
+  const handleCopy = (url, key) => {
+    const fallbackCopyTextToClipboard = (text) => {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed"; 
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopiedKey(key);
+        setTimeout(() => setCopiedKey(null), 2000);
+      } catch (err) {
+        console.error('Copy fallback execution failed', err);
+      }
+      document.body.removeChild(textArea);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url)
+        .then(() => {
+          setCopiedKey(key);
+          setTimeout(() => setCopiedKey(null), 2000);
+        })
+        .catch(() => {
+          fallbackCopyTextToClipboard(url);
+        });
+    } else {
+      fallbackCopyTextToClipboard(url);
+    }
+  };
+
+  // --- DND Handlers ---
+  const sensors = dndKit.useSensors(
+    dndKit.useSensor(dndKit.PointerSensor, { activationConstraint: { distance: 5 } }),
+    dndKit.useSensor(dndKit.KeyboardSensor, { coordinateGetter: dndKitSortable.sortableKeyboardCoordinates })
+  );
+
+  const onDragEnd = (event) => {
+    const { active, over } = event;
+    setActiveDragId(null);
+    if (!over) return;
+
+    const activeId = Number(active.id);
+    const overId = over.id;
+
+    if (kanbanBoard.columns.includes(overId)) {
+      const proj = projects.find(p => p.index_ === activeId);
+      if (proj && proj.status !== overId) {
+        updateItem(activeId, [undefined, undefined, undefined, undefined, undefined, overId]);
+      }
+    } else {
+      const overIndex = Number(overId);
+      if (activeId !== overIndex) {
+        const fromIdx = data.findIndex(d => d.index_ === activeId);
+        const toIdx = data.findIndex(d => d.index_ === overIndex);
+        if (fromIdx !== -1 && toIdx !== -1) moveItem(fromIdx, toIdx);
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
+      <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-[60]">
+        <div className="max-w-[1400px] mx-auto px-8 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4 group cursor-pointer" onClick={() => setActiveTab('home')}>
+            <div className="bg-[#550000] p-3 rounded-[1.25rem] shadow-xl shadow-[#550000]/20 text-white transform group-hover:rotate-12 transition-all">
+              <LayoutDashboard size={24} strokeWidth={2.5} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-[#550000] leading-none">ACES AUDIT</h1>
+              <div className="flex items-center gap-2 text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                Systems Node 26-27
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <nav className="flex items-center bg-slate-100/50 p-1 rounded-2xl border border-slate-200/40">
+              {[
+                { id: 'home', icon: LayoutDashboard, label: 'Home' },
+                { id: 'kanban', icon: KanbanIcon, label: 'Projects' },
+                { id: 'overview', icon: BarChart3, label: 'Overview' },
+                { id: 'calendar', icon: Calendar, label: 'Calendar' }
+              ].map(tab => (
+                <button 
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-white text-[#550000] shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  <tab.icon size={14} strokeWidth={3} /> {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {[
+              { id: 'Ledger', url: EXTERNAL_RESOURCES.LEDGER, icon: ExternalLink },
+              { id: 'Drive', url: EXTERNAL_RESOURCES.DRIVE, icon: FolderOpen },
+              { id: 'Files', url: EXTERNAL_RESOURCES.FILES, icon: FileText }
+            ].map(link => (
+              <button key={link.id} onClick={() => handleCopy(link.url, link.id)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black transition-all border ${copiedKey === link.id ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white border-slate-100 text-slate-500 hover:border-[#550000] hover:text-[#550000]'}`}>
+                {copiedKey === link.id ? <CheckCircle2 size={12} /> : <link.icon size={12} />}
+                {copiedKey === link.id ? 'COPIED' : link.id}
+              </button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {activeTab === 'home' ? (
+          <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-[#1a0000]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_#550000_0%,_#1a0000_100%)]"></div>
+            <div className="absolute top-[-20%] left-[-10%] w-[100%] h-[100%] bg-[#efbf04]/5 rounded-full blur-[120px] animate-pulse"></div>
+            
+            <div className="z-10 text-center px-10 max-w-6xl animate-in fade-in slide-in-from-bottom-10 duration-1000">
+              <h1 className="text-[10rem] md:text-[14rem] font-black text-[#efbf04] tracking-tighter leading-none drop-shadow-[0_30px_60px_rgba(0,0,0,0.9)] mb-6 select-none">ACES AUDIT</h1>
+              <p className="text-[#efbf04]/50 font-black uppercase tracking-[1em] text-sm ml-4">Audit Management & Systems Control</p>
+            </div>
+          </div>
+        ) : activeTab === 'kanban' ? (
+          <div className="flex-1 p-8 overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between mb-8 max-w-[1400px] mx-auto w-full">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Active Pipeline</h2>
+                <p className="text-slate-400 font-bold text-sm">Drag items to update operational status</p>
+              </div>
+              <button 
+                onClick={() => { setEditingItem({}); setIsModalOpen(true); }}
+                className="bg-[#550000] text-[#efbf04] px-8 py-4 rounded-3xl font-black text-sm flex items-center gap-3 shadow-2xl shadow-[#550000]/30 hover:scale-105 active:scale-95 transition-all"
+              >
+                <Plus size={20} strokeWidth={3} /> Initiate Project
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-x-auto pb-8 custom-scrollbar">
+              <dndKit.DndContext sensors={sensors} collisionDetection={dndKit.closestCorners} onDragStart={(e) => setActiveDragId(e.active.id)} onDragEnd={onDragEnd}>
+                <div className="flex gap-8 h-full min-w-max">
+                  {kanbanBoard.columns.map(col => (
+                    <div key={col} className="w-[360px] flex flex-col bg-slate-100/50 rounded-[2.5rem] border border-slate-200/40">
+                      <div className="p-6 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getStatusStyle(col).color }}></div>
+                          <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">{col}</h3>
+                        </div>
+                        <span className="bg-white px-3 py-1 rounded-full text-[10px] font-black text-slate-500 shadow-sm border border-slate-100">{kanbanBoard.board[col].length}</span>
+                      </div>
+                      <DroppableZone id={col}>
+                        <dndKitSortable.SortableContext items={kanbanBoard.board[col].map(p => p.index_.toString())} strategy={dndKitSortable.verticalListSortingStrategy}>
+                          {kanbanBoard.board[col].map(p => <SortableItem key={p.index_} id={p.index_.toString()} project={p} onEdit={(proj) => { setEditingItem(proj); setIsModalOpen(true); }} onDelete={deleteItem} />)}
+                        </dndKitSortable.SortableContext>
+                      </DroppableZone>
+                    </div>
+                  ))}
+                </div>
+                {typeof document !== 'undefined' && ReactDOM.createPortal(
+                  <dndKit.DragOverlay>
+                    {activeDragId ? (
+                      <div className="bg-white p-5 rounded-3xl border-2 border-[#efbf04] shadow-2xl w-[320px] scale-105 rotate-3 opacity-90">
+                        <h4 className="font-black text-slate-900">{projects.find(p => p.index_ === Number(activeDragId))?.name}</h4>
+                      </div>
+                    ) : null}
+                  </dndKit.DragOverlay>,
+                  document.body
+                )}
+              </dndKit.DndContext>
+            </div>
+          </div>
+        ) : activeTab === 'overview' ? (
+          <div className="flex-1 p-8 overflow-y-auto max-w-[1400px] mx-auto w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-5 space-y-8">
+                <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="bg-[#550000]/5 p-2 rounded-xl text-[#550000]"><PieChartIcon size={20} /></div>
+                    <h3 className="font-black text-slate-900 tracking-tight">Focus Allocation</h3>
+                  </div>
+                  <D3Donut data={stats} />
+                  <div className="grid grid-cols-1 gap-4 mt-8">
+                    <div className="bg-[#550000]/5 p-5 rounded-[2rem] border border-[#550000]/10 flex justify-between items-center">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Budget</span>
+                      <span className="text-2xl font-black text-[#550000]">₱{d3.sum(stats, d => d.budget).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+                  <h4 className="font-black text-xs uppercase tracking-[0.2em] text-slate-400 mb-6">Area Focus Detail</h4>
+                  <div className="space-y-3">
+                    {stats.map((s, i) => (
+                      <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-[#efbf04] transition-all">
+                        <div className="flex items-center gap-4">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}></div>
+                          <span className="text-sm font-bold text-slate-700">{s.focus}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-black text-slate-900">₱{s.budget.toLocaleString()}</div>
+                          <div className="text-[10px] font-bold text-slate-400">{s.count} Projects</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-7 space-y-8">
+                 <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm min-h-[600px] flex flex-col">
+                    <div className="flex items-center justify-between mb-8">
+                       <h3 className="font-black text-slate-900 flex items-center gap-3">
+                          <div className="bg-[#efbf04]/10 p-2 rounded-xl text-[#efbf04]"><FileText size={20} /></div>
+                          Budget Allocation
+                       </h3>
+                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total: {projects.length} Entries</div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4">
+                       {[...projects].sort((a,b) => b.budget - a.budget).map((p, i) => (
+                         <div key={i} className="flex items-center gap-6 p-5 rounded-3xl bg-white border border-slate-100 hover:shadow-lg transition-all">
+                            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center font-black text-slate-400 text-xs">#{i+1}</div>
+                            <div className="flex-1 min-w-0">
+                               <h5 className="font-black text-slate-900 truncate text-sm">{p.name}</h5>
+                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{p.focus}</p>
+                            </div>
+                            <div className="text-right shrink-0">
+                               <div className="text-sm font-black text-[#550000]">₱{p.budget.toLocaleString()}</div>
+                               <div className="mt-1"><StatusBadge status={p.status} /></div>
+                            </div>
+                         </div>
+                       ))}
+                    </div>
+                 </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* CALENDAR VISUALIZATION TAB */
+          <div className="flex-1 p-8 overflow-y-auto max-w-[1400px] mx-auto w-full animate-in fade-in duration-300">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Operations Calendar</h2>
+                <p className="text-slate-400 font-bold text-sm">Visualize project deadlines and plan schedules</p>
+              </div>
+              <div className="flex items-center bg-white border border-slate-200 shadow-sm rounded-2xl p-1.5 gap-2">
+                <button 
+                  onClick={handlePrevMonth}
+                  className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-600"
+                  title="Previous Month"
+                >
+                  <ChevronLeft size={20} strokeWidth={2.5} />
+                </button>
+                <span className="font-black text-sm uppercase tracking-wider text-slate-800 px-4 min-w-[140px] text-center">
+                  {MONTH_NAMES[month]} {year}
+                </span>
+                <button 
+                  onClick={handleNextMonth}
+                  className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-600"
+                  title="Next Month"
+                >
+                  <ChevronRight size={20} strokeWidth={2.5} />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Calendar Grid Container */}
+              <div className="lg:col-span-8 bg-white border border-slate-100 rounded-[3rem] shadow-xl p-6 md:p-8">
+                <div className="grid grid-cols-7 gap-2 mb-4 text-center">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
+                    <div key={day} className={`text-[10px] font-black uppercase tracking-widest py-2 ${idx === 0 || idx === 6 ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7 gap-2">
+                  {Array.from({ length: firstDayOfMonth }).map((_, idx) => (
+                    <div key={`empty-${idx}`} className="aspect-square bg-slate-50/40 rounded-2xl border border-slate-100/50" />
+                  ))}
+
+                  {Array.from({ length: daysInMonth }).map((_, idx) => {
+                    const dayNum = idx + 1;
+                    const dayProjects = getProjectsForDay(dayNum);
+                    
+                    return (
+                      <div 
+                        key={`day-${dayNum}`}
+                        onClick={() => handleDayClick(dayNum)}
+                        className="min-h-[140px] bg-slate-50 hover:bg-white hover:border-[#efbf04] hover:shadow-lg hover:shadow-[#efbf04]/5 cursor-pointer border border-slate-100 rounded-3xl p-3 flex flex-col transition-all group"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-xs font-black text-slate-600 group-hover:text-[#550000] group-hover:scale-110 transition-all">
+                            {dayNum}
+                          </span>
+                          <button className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-100 rounded text-slate-400 hover:text-[#550000] transition-all">
+                            <Plus size={12} strokeWidth={3} />
+                          </button>
+                        </div>
+
+                      <div className="space-y-1.5 overflow-y-auto mt-2 max-h-[110px] pr-1 custom-scrollbar">
+                        {dayProjects.map((proj) => (
+                          <div 
+                            key={proj.index_}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingItem(proj);
+                              setIsModalOpen(true);
+                            }}
+                            className="text-[10px] font-bold p-2 rounded-xl bg-white border border-slate-100 shadow-sm flex flex-col gap-1 hover:border-[#efbf04] transition-all"
+                            style={{ borderLeft: `3.5px solid ${getStatusStyle(proj.status).color}` }}
+                            title={`${proj.name} - ${proj.status}`}
+                          >
+                            <span className="truncate text-slate-800 leading-tight">{proj.name}</span>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{proj.status}</span>
+                              <span className="text-[8px] font-black text-[#efbf04]">₱{proj.budget > 0 ? (proj.budget/1000).toFixed(1) + 'k' : '0'}</span>
+                            </div>
+                          </div>
+                        ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Sidebar: Unscheduled Projects Panel */}
+              <div className="lg:col-span-4 space-y-8">
+                <div className="bg-white border border-slate-100 rounded-[3rem] shadow-sm p-8 flex flex-col max-h-[640px]">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="font-black text-slate-900 tracking-tight flex items-center gap-2">
+                      <AlertCircle size={18} className="text-[#efbf04]" />
+                      Unscheduled ({unscheduledProjects.length})
+                    </h3>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-3">
+                    {unscheduledProjects.length === 0 ? (
+                      <div className="py-12 text-center text-slate-300">
+                        <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-400 opacity-60" />
+                        <span className="text-xs font-black uppercase tracking-wider">All projects scheduled</span>
+                      </div>
+                    ) : (
+                      unscheduledProjects.map(proj => (
+                        <div 
+                          key={proj.index_}
+                          onClick={() => {
+                            setEditingItem(proj);
+                            setIsModalOpen(true);
+                          }}
+                          className="p-4 bg-slate-50 hover:bg-white hover:border-[#efbf04] hover:shadow-md border border-slate-100 rounded-2xl cursor-pointer transition-all group"
+                        >
+                          <div className="flex justify-between items-start gap-2 mb-2">
+                            <h4 className="font-black text-slate-800 text-xs leading-snug group-hover:text-[#550000] transition-colors truncate">
+                              {proj.name}
+                            </h4>
+                            <StatusBadge status={proj.status} />
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-black">
+                            <span>{proj.head || "No Assigned Lead"}</span>
+                            <span className="text-[#550000]">₱{proj.budget.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-[#550000]/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-200">
+            <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+               <h3 className="text-xl font-black text-[#550000] tracking-tight">{editingItem?.index_ ? 'Edit Project' : 'New Audit Project'}</h3>
+               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-all text-slate-400"><X size={20}/></button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.target);
+              const payload = [fd.get('id'), fd.get('name'), fd.get('head'), fd.get('focus'), fd.get('date'), fd.get('status'), undefined, fd.get('budget'), fd.get('notes')];
+              editingItem?.index_ ? updateItem(editingItem.index_, payload) : insertItem(undefined, payload);
+              setIsModalOpen(false);
+            }} className="p-10 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Project ID</label>
+                  <input name="id" defaultValue={editingItem?.id} required className="w-full px-5 py-4 bg-slate-100/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-[#550000]/5 focus:border-[#550000] outline-none font-bold text-sm" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Phase</label>
+                  <select name="status" defaultValue={editingItem?.status} className="w-full px-5 py-4 bg-slate-100/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-[#550000]/5 focus:border-[#550000] outline-none font-bold text-sm">
+                    {kanbanBoard.columns.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Project Name</label>
+                <input name="name" defaultValue={editingItem?.name} required className="w-full px-5 py-4 bg-slate-100/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-[#550000]/5 focus:border-[#550000] outline-none font-bold text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Area Focus</label>
+                  <input name="focus" defaultValue={editingItem?.focus} className="w-full px-5 py-4 bg-slate-100/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-[#550000]/5 focus:border-[#550000] outline-none font-bold text-sm" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Budget (₱)</label>
+                  <input name="budget" defaultValue={editingItem?.budget} className="w-full px-5 py-4 bg-slate-100/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-[#550000]/5 focus:border-[#550000] outline-none font-bold text-sm" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Date</label>
+                <input type="date" name="date" defaultValue={editingItem?.date} className="w-full px-5 py-4 bg-slate-100/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-[#550000]/5 focus:border-[#550000] outline-none font-bold text-sm" />
+              </div>
+              <div className="pt-6 flex gap-4">
+                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-black text-slate-400 hover:text-slate-600">Discard</button>
+                 <button type="submit" className="flex-2 bg-[#550000] text-[#efbf04] px-12 py-4 rounded-[2rem] font-black text-sm shadow-xl shadow-[#550000]/20">Save Record</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 20px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+      `}</style>
+    </div>
+  );
+}
