@@ -88,7 +88,7 @@ export default function LedgerTab({ ledger, project, projectCodes, followLink })
         onNextMonth={() => handleMonthShift(1)}
       />
 
-      <div className="p-3 md:p-8 max-w-[1600px] mx-auto w-full flex-1 overflow-y-auto">
+      <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full flex-1 overflow-y-auto">
         <header className="flex flex-col md:flex-row md:items-end justify-between mb-6 md:mb-8 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
