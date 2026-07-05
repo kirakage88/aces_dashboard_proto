@@ -5,15 +5,15 @@ export default function BudgetAllocationList({ projects, spendMap, view }) {
   const sorted = [...projects].sort((a, b) => b.budget - a.budget);
 
   return (
-    <div className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-slate-100 shadow-sm min-h-[400px] md:min-h-[600px] flex flex-col">
+    <div className="bg-white dark:bg-dark-card p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-slate-100 dark:border-dark-border shadow-sm min-h-[400px] md:min-h-[600px] flex flex-col transition-colors">
       <div className="flex items-center justify-between mb-6 md:mb-8">
-        <h3 className="font-black text-slate-900 flex items-center gap-3 text-sm md:text-base">
-          <div className="bg-[#efbf04]/10 p-1.5 md:p-2 rounded-xl text-[#efbf04]">
+        <h3 className="font-black text-slate-900 dark:text-dark-text flex items-center gap-3 text-sm md:text-base transition-colors">
+          <div className="bg-[#efbf04]/10 dark:bg-dark-accent/10 p-1.5 md:p-2 rounded-xl text-[#efbf04] dark:text-dark-accent">
             <FileText size={16} />
           </div>
           Budget Allocation
         </h3>
-        <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
+        <div className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest transition-colors">
           Total: {projects.length} Entries
         </div>
       </div>
@@ -25,14 +25,14 @@ export default function BudgetAllocationList({ projects, spendMap, view }) {
           return (
             <div
               key={p.index_}
-              className="flex items-center gap-3 md:gap-6 p-3 md:p-5 rounded-2xl md:rounded-3xl bg-white border border-slate-100 hover:shadow-lg transition-all"
+              className="flex items-center gap-3 md:gap-6 p-3 md:p-5 rounded-2xl md:rounded-3xl bg-white dark:bg-dark-input border border-slate-100 dark:border-dark-border-md hover:shadow-lg transition-all"
             >
-              <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-slate-50 flex items-center justify-center font-black text-slate-400 text-[9px] md:text-xs shrink-0">
+              <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-slate-50 dark:bg-dark-hover flex items-center justify-center font-black text-slate-400 dark:text-dark-muted text-[9px] md:text-xs shrink-0 transition-colors">
                 #{i + 1}
               </div>
               <div className="flex-1 min-w-0">
-                <h5 className="font-black text-slate-900 truncate text-xs md:text-sm">{p.name}</h5>
-                <p className="text-[8px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 md:mt-1">
+                <h5 className="font-black text-slate-900 dark:text-dark-text truncate text-xs md:text-sm transition-colors">{p.name}</h5>
+                <p className="text-[8px] md:text-[10px] font-bold text-slate-400 dark:text-dark-muted uppercase tracking-widest mt-0.5 md:mt-1 transition-colors">
                   {p.focus}
                 </p>
               </div>
@@ -40,13 +40,13 @@ export default function BudgetAllocationList({ projects, spendMap, view }) {
                 <div className="text-right shrink-0">
                   <div className="text-xs md:text-sm font-black text-[#550000]">₱{spent.toLocaleString()}</div>
                   <div className="mt-1 hidden md:block">
-                    <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden ml-auto">
+                      <div className="w-24 h-1.5 bg-slate-100 dark:bg-dark-hover rounded-full overflow-hidden ml-auto transition-colors">
                       <div
-                        className="bg-[#efbf04] h-full rounded-full"
+                        className="bg-[#efbf04] dark:bg-[#fbcc0e] h-full rounded-full"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <div className="text-[9px] font-bold text-slate-400 mt-0.5">
+                    <div className="text-[9px] font-bold text-slate-400 dark:text-dark-muted mt-0.5 transition-colors">
                       ₱{remaining.toLocaleString()} left
                     </div>
                   </div>

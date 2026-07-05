@@ -37,13 +37,13 @@ export default function OverviewTab({ project, spendMap }) {
   return (
     <div className="flex-1 p-4 md:p-8 overflow-y-auto max-w-[1400px] mx-auto w-full">
       <div className="flex items-center gap-4 mb-6 md:mb-8">
-        <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/40">
+        <div className="flex bg-slate-100/50 dark:bg-dark-input/50 p-1 rounded-2xl border border-slate-200/40 dark:border-dark-border-md/40 transition-colors">
           <button
             onClick={() => setView('allocation')}
             className={`px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-[10px] md:text-xs font-black transition-all flex items-center gap-2 ${
               view === 'allocation'
-                ? 'bg-white text-[#550000] shadow-md'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white dark:bg-dark-input text-[#550000] dark:text-dark-accent shadow-md'
+                : 'text-slate-500 dark:text-dark-muted hover:text-slate-800 dark:hover:text-dark-text'
             }`}
           >
             <PieChartIcon size={14} strokeWidth={3} /> Allocation
@@ -52,8 +52,8 @@ export default function OverviewTab({ project, spendMap }) {
             onClick={() => setView('actual')}
             className={`px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-[10px] md:text-xs font-black transition-all flex items-center gap-2 ${
               view === 'actual'
-                ? 'bg-white text-[#550000] shadow-md'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white dark:bg-dark-input text-[#550000] dark:text-dark-accent shadow-md'
+                : 'text-slate-500 dark:text-dark-muted hover:text-slate-800 dark:hover:text-dark-text'
             }`}
           >
             <TrendingDown size={14} strokeWidth={3} /> Actual Spent
@@ -63,19 +63,19 @@ export default function OverviewTab({ project, spendMap }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 items-start">
         <div className="lg:col-span-5 space-y-6 md:space-y-8">
-          <div className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50">
+          <div className="bg-white dark:bg-dark-card p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-slate-100 dark:border-dark-border shadow-xl shadow-slate-200/50 dark:shadow-black/20 transition-colors">
             <div className="flex items-center gap-3 mb-4 md:mb-6">
               <div className="bg-[#550000]/5 p-1.5 md:p-2 rounded-xl text-[#550000]">
                 <PieChartIcon size={16} />
               </div>
-              <h3 className="font-black text-slate-900 tracking-tight text-sm md:text-base">
+              <h3 className="font-black text-slate-900 dark:text-dark-text tracking-tight text-sm md:text-base transition-colors">
                 {view === 'allocation' ? 'Focus Allocation' : 'Actual Spend'}
               </h3>
             </div>
             <D3Donut data={activeStats} />
             <div className="grid grid-cols-1 gap-4 mt-6 md:mt-8">
               <div className="bg-[#550000]/5 p-4 md:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-[#550000]/10 flex justify-between items-center">
-                <span className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <span className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest transition-colors">
                   {view === 'allocation' ? 'Global Budget' : 'Total Spent'}
                 </span>
                 <span className="text-xl md:text-2xl font-black text-[#550000]">

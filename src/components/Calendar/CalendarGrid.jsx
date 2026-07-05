@@ -44,22 +44,22 @@ export default function CalendarGrid({ calendarDate, projects, onPrevMonth, onNe
   };
 
   return (
-    <div className="lg:col-span-8 bg-white border border-slate-100 rounded-[2rem] md:rounded-[3rem] shadow-xl p-4 md:p-8">
+    <div className="lg:col-span-8 bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-[2rem] md:rounded-[3rem] shadow-xl p-4 md:p-8 transition-colors">
       <div className="flex items-center justify-between mb-6 md:mb-8 flex-col md:flex-row gap-3">
-        <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Operations Calendar</h2>
-        <div className="flex items-center bg-white border border-slate-200 shadow-sm rounded-2xl p-1.5 gap-2">
+        <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-dark-text tracking-tight transition-colors">Operations Calendar</h2>
+        <div className="flex items-center bg-white dark:bg-dark-input border border-slate-200 dark:border-dark-border-md shadow-sm rounded-2xl p-1.5 gap-2 transition-colors">
           <button
             onClick={onPrevMonth}
-            className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-600"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-dark-hover rounded-xl transition-all text-slate-600 dark:text-dark-muted"
           >
             <ChevronLeft size={18} strokeWidth={2.5} />
           </button>
-          <span className="font-black text-xs md:text-sm uppercase tracking-wider text-slate-800 px-2 md:px-4 min-w-[120px] md:min-w-[140px] text-center">
+          <span className="font-black text-xs md:text-sm uppercase tracking-wider text-slate-800 dark:text-dark-text px-2 md:px-4 min-w-[120px] md:min-w-[140px] text-center transition-colors">
             {MONTH_NAMES[month]} {year}
           </span>
           <button
             onClick={onNextMonth}
-            className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-600"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-dark-hover rounded-xl transition-all text-slate-600 dark:text-dark-muted"
           >
             <ChevronRight size={18} strokeWidth={2.5} />
           </button>
@@ -70,8 +70,8 @@ export default function CalendarGrid({ calendarDate, projects, onPrevMonth, onNe
         {DAY_HEADERS.map((day, idx) => (
           <div
             key={day}
-            className={`text-[8px] md:text-[10px] font-black uppercase tracking-widest py-1 md:py-2 ${
-              idx === 0 || idx === 6 ? 'text-slate-400' : 'text-slate-500'
+            className={`text-[8px] md:text-[10px] font-black uppercase tracking-widest py-1 md:py-2 transition-colors ${
+              idx === 0 || idx === 6 ? 'text-slate-400 dark:text-dark-muted' : 'text-slate-500 dark:text-dark-muted'
             }`}
           >
             {day}
@@ -81,7 +81,7 @@ export default function CalendarGrid({ calendarDate, projects, onPrevMonth, onNe
 
       <div className="grid grid-cols-7 gap-1 md:gap-2">
         {Array.from({ length: firstDayOfMonth }).map((_, idx) => (
-          <div key={`empty-${idx}`} className="aspect-square bg-slate-50/40 rounded-xl md:rounded-2xl border border-slate-100/50" />
+          <div key={`empty-${idx}`} className="aspect-square bg-slate-50/40 dark:bg-dark-input/40 rounded-xl md:rounded-2xl border border-slate-100/50 dark:border-dark-border/50 transition-colors" />
         ))}
 
         {Array.from({ length: daysInMonth }).map((_, idx) => {
@@ -92,13 +92,13 @@ export default function CalendarGrid({ calendarDate, projects, onPrevMonth, onNe
             <div
               key={`day-${dayNum}`}
               onClick={() => onDayClick(dayNum, month, year)}
-              className="min-h-[80px] md:min-h-[140px] bg-slate-50 hover:bg-white hover:border-[#efbf04] hover:shadow-lg hover:shadow-[#efbf04]/5 cursor-pointer border border-slate-100 rounded-xl md:rounded-3xl p-1.5 md:p-3 flex flex-col transition-all group"
+              className="min-h-[80px] md:min-h-[140px] bg-slate-50 dark:bg-dark-input/50 hover:bg-white dark:hover:bg-dark-hover hover:border-[#efbf04] dark:hover:border-[#fbcc0e] hover:shadow-lg hover:shadow-[#efbf04]/5 dark:hover:shadow-[#fbcc0e]/5 cursor-pointer border border-slate-100 dark:border-dark-border-md rounded-xl md:rounded-3xl p-1.5 md:p-3 flex flex-col transition-all group"
             >
               <div className="flex justify-between items-start mb-1 md:mb-2">
-                <span className="text-[10px] md:text-xs font-black text-slate-600 group-hover:text-[#550000] group-hover:scale-110 transition-all">
+                <span className="text-[10px] md:text-xs font-black text-slate-600 dark:text-dark-muted group-hover:text-[#550000] dark:group-hover:text-dark-accent group-hover:scale-110 transition-all">
                   {dayNum}
                 </span>
-                <button className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-100 rounded text-slate-400 hover:text-[#550000] transition-all hidden md:block">
+                <button className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-100 dark:hover:bg-dark-hover rounded text-slate-400 dark:text-dark-muted hover:text-[#550000] dark:hover:text-dark-accent transition-all hidden md:block">
                   <Plus size={12} strokeWidth={3} />
                 </button>
               </div>
@@ -111,15 +111,15 @@ export default function CalendarGrid({ calendarDate, projects, onPrevMonth, onNe
                       e.stopPropagation();
                       onProjectClick(proj);
                     }}
-                    className="text-[8px] md:text-[10px] font-bold p-1 md:p-2 rounded-lg md:rounded-xl bg-white border border-slate-100 shadow-sm flex flex-col gap-0.5 md:gap-1 hover:border-[#efbf04] transition-all"
+                    className="text-[8px] md:text-[10px] font-bold p-1 md:p-2 rounded-lg md:rounded-xl bg-white dark:bg-dark-input border border-slate-100 dark:border-dark-border-md shadow-sm flex flex-col gap-0.5 md:gap-1 hover:border-[#efbf04] dark:hover:border-[#fbcc0e] transition-all"
                     style={{ borderLeft: `3px solid ${getStatusStyle(proj.status).color}` }}
                   >
-                    <span className="truncate text-slate-800 leading-tight">{proj.name}</span>
+                    <span className="truncate text-slate-800 dark:text-dark-text leading-tight transition-colors">{proj.name}</span>
                     <div className="items-center justify-between hidden md:flex">
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">
+                      <span className="text-[8px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-tighter transition-colors">
                         {proj.status}
                       </span>
-                      <span className="text-[8px] font-black text-[#efbf04]">
+                      <span className="text-[8px] font-black text-[#efbf04] dark:text-[#fbcc0e]">
                         ₱{proj.budget > 0 ? (proj.budget / 1000).toFixed(1) + 'k' : '0'}
                       </span>
                     </div>

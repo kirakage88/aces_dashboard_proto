@@ -3,6 +3,17 @@ export const THEME = {
   accent: '#efbf04',
   text: '#1a1a1a',
   bg: '#f8fafc',
+  dark: {
+    bg: '#101010',
+    card: '#090d10',
+    text: '#d6def0',
+    muted: '#8895b5',
+    border: '#1c2330',
+    'border-md': '#283040',
+    input: '#111a24',
+    hover: '#1a2230',
+    accent: '#fbcc0e',
+  },
 };
 
 export const CHART_COLORS = [

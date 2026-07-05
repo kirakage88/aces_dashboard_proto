@@ -8,6 +8,8 @@ export default function D3Donut({ data }) {
   useEffect(() => {
     if (!ref.current || !data.length) return;
 
+    const isDark = document.documentElement.classList.contains('dark');
+
     const width = 260;
     const height = 260;
     const margin = 20;
@@ -35,7 +37,7 @@ export default function D3Donut({ data }) {
       .append('path')
       .attr('d', arc)
       .attr('fill', (d, i) => color(i))
-      .attr('stroke', 'white')
+      .attr('stroke', isDark ? '#1f2937' : 'white')
       .attr('stroke-width', 3)
       .style('cursor', 'pointer')
       .on('mouseenter', function () {
@@ -50,7 +52,7 @@ export default function D3Donut({ data }) {
       .attr('dy', '-0.1em')
       .style('font-size', '22px')
       .style('font-weight', '900')
-      .style('fill', '#550000')
+      .style('fill', isDark ? '#fbcc0e' : '#550000')
       .text(`₱${total > 999 ? (total / 1000).toFixed(1) + 'k' : total}`);
 
     svg.append('text')
@@ -58,7 +60,7 @@ export default function D3Donut({ data }) {
       .attr('dy', '1.5em')
       .style('font-size', '10px')
       .style('font-weight', '800')
-      .style('fill', '#64748b')
+      .style('fill', isDark ? '#9ca3af' : '#64748b')
       .style('text-transform', 'uppercase')
       .text('Total Budget');
   }, [data]);

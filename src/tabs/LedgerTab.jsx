@@ -81,7 +81,7 @@ export default function LedgerTab({ ledger, project, projectCodes, followLink })
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans flex flex-col">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-dark-bg text-slate-900 dark:text-dark-text font-sans flex flex-col transition-colors">
       <ContextRibbon
         summary={{ ...summary, month: ribbonMonth }}
         onPrevMonth={() => handleMonthShift(-1)}
@@ -91,17 +91,17 @@ export default function LedgerTab({ ledger, project, projectCodes, followLink })
       <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full flex-1 overflow-y-auto">
         <header className="flex flex-col md:flex-row md:items-end justify-between mb-6 md:mb-8 gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+            <h1 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-dark-text tracking-tight flex items-center gap-3 transition-colors">
               Ledger Dashboard
-              <div className="h-6 w-[2px] bg-slate-100 hidden sm:block" />
-              <span className="text-[10px] md:text-xs font-bold text-slate-400 bg-white border border-slate-100 px-3 py-1 rounded-full shadow-sm">
+              <div className="h-6 w-[2px] bg-slate-100 dark:bg-dark-input hidden sm:block transition-colors" />
+              <span className="text-[10px] md:text-xs font-bold text-slate-400 dark:text-dark-muted bg-white dark:bg-dark-input border border-slate-100 dark:border-dark-border-md px-3 py-1 rounded-full shadow-sm transition-colors">
                 Real-time Sync
               </span>
             </h1>
           </div>
           <button
             onClick={() => setIsAddingEntry(true)}
-            className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#550000] hover:bg-[#800000] text-[#efbf04] px-6 md:px-8 py-3 md:py-3.5 rounded-2xl font-black text-xs md:text-sm transition-all shadow-xl shadow-[#550000]/20 active:scale-95"
+            className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#550000] hover:bg-[#800000] text-[#efbf04] dark:text-[#fbcc0e] px-6 md:px-8 py-3 md:py-3.5 rounded-2xl font-black text-xs md:text-sm transition-all shadow-xl shadow-[#550000]/20 active:scale-95"
           >
             <Plus size={20} strokeWidth={3} />
             Add Transaction
