@@ -1,117 +1,147 @@
 # ACES Dashboard Prototype
 
-A centralized dashboard for the Association of the College of Engineering Students (ACES) at Xavier University. Built with React + Vite, deployed on GitHub Pages, with Google Sheets as the backend data layer.
+A centralized dashboard for the Association of the College of Engineering Students (ACES) at Xavier University — project management, financial tracking, and document linking, all in one place.
 
-## Reference Code
+Built with **React + Vite**, deployed on **GitHub Pages**, with **Google Sheets** as the backend data layer. No server needed.
 
-The `reference/` folder contains two types of reference material:
+> **Live site:** https://kirakage88.github.io/aces_dashboard_proto/
 
-### Canvas App Prototypes (UI/UX reference)
+---
 
-| File | Description |
+## Features
+
+- **5-tab navigation** — Home, Projects (Kanban), Overview (Charts), Calendar, Ledger
+- **Kanban board** — Drag-and-drop project cards across Not Started / In Progress / Post-Docs / Done columns. Cards show progress bars based on ledger spending.
+- **Project detail page** — Full-page WYSIWYG editor (BlockNote) with Notion-like property table (code, name, head, focus, dates, status, budget). Template system for new projects.
+- **Overview tab** — D3.js donut chart (budget by area focus), sorted project budget list with rank, spending breakdown.
+- **Calendar tab** — Month grid with projects plotted on implementation dates. Unscheduled projects sidebar. Day click opens project detail modal.
+- **Ledger tab** — Transaction table with project/account filters, inline editing. Summary cards (total debit, credit, balance, count). D3.js horizontal bar chart (debit by project) and account breakdown list. Month navigation with header metadata.
+- **Template manager** — In-app creation, editing, deletion, and default-selection of BlockNote project templates. Persisted to localStorage.
+- **Dark mode** — Toggle with live `<html class="dark">` toggle, persists to localStorage.
+- **Clipboard linking** — Click external resource buttons (Ledger, Drive, Files) to copy URLs to clipboard.
+- **Mobile responsive** — Hamburger menu navigation on small screens, responsive layouts throughout.
+
+---
+
+## Tech Stack
+
+| Category | Library |
 |---|---|
-| `reference/ACES Project Dashboard` | Canvas app #1 — React + dnd-kit Kanban, D3.js donut chart, calendar view, clipboard link navigation. Main project management interface. |
-| `reference/ACES Ledger Dashboard` | Canvas app #2 — React financial ledger with D3.js rollups, summary cards, transaction CRUD modal, project/account filters, month navigation. |
+| Framework | React 18, Vite 6 |
+| Styling | Tailwind CSS 3 |
+| Drag & Drop | @dnd-kit/core, @dnd-kit/sortable |
+| Charts | D3.js 7 |
+| CSV Parsing | PapaParse |
+| WYSIWYG Editor | @blocknote/react 0.51 (lazy-loaded, ~852 KB) |
+| Icons | Lucide React |
+| Deployment | gh-pages, GitHub Actions |
 
-**Key features to re-implement from Canvas:**
-- 4-tab navigation (Home, Projects/Kanban, Overview/Charts, Calendar)
-- Drag-and-drop Kanban board for project status tracking
-- D3.js budget allocation donut chart + bar chart distribution
-- Calendar with unscheduled projects panel
-- Modal form for adding/editing projects and transactions
-- Clipboard-based Google resource linking (Ledger, Drive, Files)
-- Ledger-style transaction table with inline editing and filtering
+---
 
-### Sample Data (CSV)
+## Implementation Phases
 
-| File | Description |
+| Phase | Description |
 |---|---|
-| `reference/project_reference.csv` | Project Tracker sample data — columns: Project Code, Name, Head, Area Focus, Date, Status, Budget |
-| `reference/ledger_reference.csv` | Ledger sample data — columns: Date, Entry ID, Type, Description, Debit, Credit, Account, Project ID, Filing Status |
+| **Phase 0** — Scaffold | Vite project init, install deps, CSV parser, public fallback CSVs, GitHub Pages base config |
+| **Phase 1** — Shell & Data | `App.jsx` tab switcher, Layout/Header with navigation, `useSheetData()` hook, theme constants (maroon/gold), external resource clipboard buttons |
+| **Phase 2** — Project Dashboard | Kanban board (dnd-kit), project CRUD modal, D3 donut + bar charts (Overview), Calendar tab with month grid + unscheduled panel |
+| **Phase 3** — Ledger Dashboard | Summary metric cards, D3 horizontal bar chart + account breakdown, transaction table with filters/CRUD, month navigation with header metadata |
+| **Phase 4** — Deploy | GitHub Actions auto-deploy on push to main, `gh-pages` manual fallback |
+| **Phase 5** — Project Details | Full-page BlockNote editor with properties table, template management (localStorage CRUD), code-split BlockNote lazy chunk |
+| **Phase 6** (planned) | Project views & filters (Kanban/Table/Calendar switcher, global filter bar) |
 
-These CSVs serve as the **data contract** — the dashboard must be able to consume both structures. Use them to seed the app during development and to validate parsing/filtering logic.
+---
 
 ## Architecture
 
 ```
-Google Sheets ──→ Published as CSV/JSON ──→ React app (static) ──→ GitHub Pages
-  (data entry)    (auto-updating URL)        (reads + displays)
+Google Sheets ──→ Published as CSV ──→ React app (static) ──→ GitHub Pages
+  (data entry)    (auto-updating URL)     (reads + displays)
 ```
 
-**Key design decisions:**
-- **No backend server** — static site only, data is fetched client-side from published Google Sheets
-- **Google Sheets is the source of truth** — departments continue using Sheets for data entry, the dashboard only reads
-- **GitHub Pages for hosting** — free, fast, no maintenance
-- **React + Vite** — modern toolchain, easy to extend
+- **No backend** — Static SPA only. Data fetched client-side from published Google Sheets CSV URLs.
+- **Google Sheets is the source of truth** — CRUD operations are in-memory only (ephemeral). Departments continue using Sheets for data entry.
+- **Column discovery** — Header row is found by searching for a cell containing `"no."`. All column indices use `getColIndex(headers, ['keyword1', 'keyword2'])` — never hardcoded.
+- **Lazy loading** — BlockNote editor chunk (~852 KB) loaded on demand via `React.lazy`. Main bundle is ~346 KB.
 
-## Sheets (Data Sources)
-
-| Tracker | Purpose | Status |
-|---|---|---|
-| Project Tracker | Master list of all projects and their status | Configured |
-| Ledger | Financial tracking (income/expenditure per project) | Configured |
-| Project Documentation | Google Doc template per project (linked, not fetched) | N/A |
-| Physical Filing System | Labeled physical folders (offline, linked only) | N/A |
+---
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- npm or yarn
+- npm
 
-### Install
+### Install & Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Opens at `http://localhost:5173`.
+Opens at `http://localhost:5173`. In dev mode, data loads from `public/*.csv` unless `VITE_PROJECT_TRACKER_URL` and `VITE_LEDGER_URL` env vars are set.
 
-### Add a Google Sheet as a data source
+### Configure Google Sheets as data source
 
-1. Open your Google Sheet
-2. **File → Share → Publish to web**
-3. Choose **Entire Document** or a specific sheet, format **CSV**
-4. Copy the published URL
-5. Add it to `src/data/sources.js` (or equivalent config file)
+1. Open your Google Sheet → **File → Share → Publish to web**
+2. Choose sheet, format **CSV**, copy the published URL
+3. Set environment variables or update `src/data/sources.js`
 
-### Deploy to GitHub Pages
+### Build
 
 ```bash
-npm run build
-npm run deploy
+npm run build     # outputs to dist/
 ```
 
-The site goes live at `https://<username>.github.io/aces-dashboard-proto/`.
+No test suite exists; `build` is the only verification step.
+
+---
 
 ## Project Structure
 
 ```
 aces-dashboard-proto/
-├── public/               # Static assets
+├── public/                    # Static assets (dev CSV fallbacks)
+├── reference/                 # Data contract CSVs + Canvas prototype specs
 ├── src/
-│   ├── components/       # React components
-│   │   ├── Dashboard/    # Summary cards, KPIs
-│   │   ├── Tracker/      # Table views for each tracker
-│   │   └── Layout/       # Navigation, header
-│   ├── data/             # Sheet URLs, data fetching logic
-│   ├── App.jsx           # Root component
-│   └── main.jsx          # Entry point
-├── package.json
-├── vite.config.js
-└── README.md
+│   ├── App.jsx                # Root component, tab switcher
+│   ├── main.jsx               # Entry point
+│   ├── constants.js           # Theme colors, chart colors, tab definitions
+│   ├── index.css              # Tailwind directives + custom styles
+│   ├── components/
+│   │   ├── Layout/            # Header, navigation, dark mode toggle
+│   │   ├── Tracker/           # KanbanBoard, ProjectDetailPage, TemplateManager, etc.
+│   │   ├── Calendar/          # Calendar grid, day panel
+│   │   ├── Ledger/            # Transaction table, summary cards, filters
+│   │   ├── Overview/          # Donut chart, budget list
+│   │   └── shared/            # Shared UI components
+│   ├── tabs/                  # Tab-level views (Projects, Overview, Calendar, Ledger)
+│   ├── data/                  # CSV fetching (csvParser.js), sheet URL config (sources.js)
+│   ├── hooks/                 # useSheetData, useDarkMode
+│   └── utils/                 # ledger.js, project.js, templates.js
+├── vite.config.js             # Vite + React plugin, base path config
+├── tailwind.config.js         # Dark mode custom palette
+├── postcss.config.js          # Tailwind + autoprefixer
+└── PLAN.md                    # Full roadmap
 ```
 
-## Features (Planned)
+---
 
-- [ ] Summary dashboard with KPI cards (total projects, budget spent, pending items)
-- [ ] Project Tracker table view with filtering and search
-- [ ] Ledger view with financial summaries
-- [ ] Auto-refresh from Google Sheets
-- [ ] Dark mode toggle
-- [ ] Mobile responsive
+## Deployment
+
+### Automatic (CI)
+
+Push to `main` — GitHub Actions (`.github/workflows/deploy.yml`) builds and deploys to GitHub Pages automatically.
+
+### Manual
+
+```bash
+npm run build
+npm run deploy      # gh-pages -d dist
+```
+
+---
 
 ## Related
 
