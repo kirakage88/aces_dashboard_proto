@@ -20,17 +20,25 @@ export function transformProjects(data) {
   if (!data || data.length <= 1) return [];
   return data.slice(1)
     .filter((row) => row.row[1] || row.row[3])
-    .map((row) => ({
-      index_: row.index_,
-      id: row.row[0],
-      name: row.row[1] || 'Untitled Project',
-      head: row.row[2],
-      focus: row.row[3],
-      date: row.row[4],
-      status: row.row[5] || 'Not Started',
-      budget: parseCurrency(row.row[7]),
-      notes: row.row[8],
-    }));
+    .map((row) => {
+      let details = null;
+      try {
+        const raw = row.row[6];
+        if (raw) details = JSON.parse(raw);
+      } catch {}
+      return {
+        index_: row.index_,
+        id: row.row[0],
+        name: row.row[1] || 'Untitled Project',
+        head: row.row[2],
+        focus: row.row[3],
+        date: row.row[4],
+        status: row.row[5] || 'Not Started',
+        details,
+        budget: parseCurrency(row.row[7]),
+        notes: row.row[8],
+      };
+    });
 }
 
 export function generateProjectCode(data, dateStr) {

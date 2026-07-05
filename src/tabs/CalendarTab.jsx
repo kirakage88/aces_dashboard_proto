@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import CalendarGrid from '../components/Calendar/CalendarGrid';
 import UnscheduledPanel from '../components/Calendar/UnscheduledPanel';
-import ProjectModal from '../components/Tracker/ProjectModal';
 import { transformProjects } from '../utils/project';
+
+const ProjectDetailModal = lazy(() => import('../components/Tracker/ProjectDetailModal'));
 
 export default function CalendarTab({ project, spendMap }) {
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -79,12 +80,14 @@ export default function CalendarTab({ project, spendMap }) {
         />
       </div>
       {isModalOpen && (
-        <ProjectModal
-          editingItem={editingItem}
-          onSave={handleSave}
-          onClose={() => { setIsModalOpen(false); setEditingItem(null); }}
-          projectData={project.data}
-        />
+        <Suspense fallback={null}>
+          <ProjectDetailModal
+            editingItem={editingItem}
+            onSave={handleSave}
+            onClose={() => { setIsModalOpen(false); setEditingItem(null); }}
+            projectData={project.data}
+          />
+        </Suspense>
       )}
     </div>
   );
