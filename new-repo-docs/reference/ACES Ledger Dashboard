@@ -1,0 +1,762 @@
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  DollarSign, 
+  PieChart, 
+  BarChart3, 
+  Plus, 
+  Trash2, 
+  Edit2, 
+  ExternalLink, 
+  Filter,
+  ArrowUpRight,
+  ArrowDownRight,
+  Calendar,
+  Layers,
+  CheckCircle2,
+  User,
+  Clock,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  X,
+  FileText,
+  Tag,
+  Hash,
+  Link2
+} from 'lucide-react';
+import * as d3 from 'd3';
+
+function App({ data, updateItem, deleteItem, insertItem, moveItem, followLink }) {
+  const [isAddingEntry, setIsAddingEntry] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [filterProject, setFilterProject] = useState('All');
+  const [filterAccount, setFilterAccount] = useState('All');
+
+  // --- Summary Metadata Discovery (Rows 0-1) ---
+  const getSummaryValue = (keyword) => {
+    for (let r = 0; r < Math.min(data.length, 3); r++) {
+      const idx = data[r].row.findIndex(cell => 
+        typeof cell === 'string' && cell.toLowerCase().includes(keyword.toLowerCase())
+      );
+      if (idx !== -1) {
+        for (let i = idx + 1; i < Math.min(idx + 4, data[r].row.length); i++) {
+          const val = data[r].row[i];
+          if (val !== null && val !== "" && !(typeof val === 'string' && val.includes(':'))) {
+            return val;
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const updateSummaryValue = (keyword, newValue) => {
+    for (let r = 0; r < Math.min(data.length, 3); r++) {
+      const rowData = data[r].row;
+      const idx = rowData.findIndex(cell => 
+        typeof cell === 'string' && cell.toLowerCase().includes(keyword.toLowerCase())
+      );
+      if (idx !== -1) {
+        let valueCol = idx + 1;
+        for (let i = idx + 1; i < Math.min(idx + 4, rowData.length); i++) {
+          if (rowData[i] !== null && rowData[i] !== "" && !(typeof rowData[i] === 'string' && rowData[i].includes(':'))) {
+            valueCol = i; break;
+          }
+        }
+        const patch = [];
+        patch[valueCol] = newValue;
+        updateItem(data[r].index_, patch);
+        break;
+      }
+    }
+  };
+
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  const handleMonthShift = (delta) => {
+    const currentMonth = String(summary.month).trim();
+    let index = months.findIndex(m => m.toLowerCase() === currentMonth.toLowerCase());
+    if (index === -1) index = 0;
+    const nextIndex = (index + delta + 12) % 12;
+    updateSummaryValue('transaction \nmonth', months[nextIndex]);
+  };
+
+  const summary = {
+    month: getSummaryValue('transaction \nmonth') || getSummaryValue('month') || 'N/A',
+    debit: parseFloat(String(getSummaryValue('monthly debit') || 0).replace(/[₱,]/g, '')) || 0,
+    credit: parseFloat(String(getSummaryValue('monthly credit') || 0).replace(/[₱,]/g, '')) || 0,
+    balance: parseFloat(String(getSummaryValue('monthly balance') || 0).replace(/[₱,]/g, '')) || 0,
+    status: getSummaryValue('book status') || 'UNKNOWN',
+    openedOn: getSummaryValue('opened on') || 'N/A',
+    openedBy: getSummaryValue('opened by') || 'N/A',
+  };
+
+  // --- Table Header Discovery ---
+  const headerRowIndex = data.findIndex(row => 
+    row.row.some(cell => typeof cell === 'string' && cell.toLowerCase().includes('no.'))
+  );
+  const headers = headerRowIndex !== -1 ? data[headerRowIndex].row : [];
+  
+  const getColIndex = (keywords) => {
+    return headers.findIndex(h => h && keywords.some(k => h.toLowerCase().includes(k.toLowerCase())));
+  };
+
+  const colIdx = useMemo(() => ({
+    no: getColIndex(['no.']),
+    date: getColIndex(['date recorded']),
+    entryCode: getColIndex(['entry code']),
+    type: getColIndex(['type']),
+    dateIssued: getColIndex(['date issued']),
+    description: getColIndex(['description']),
+    invoice: getColIndex(['invoice', 'doc no']),
+    debit: getColIndex(['debit']),
+    credit: getColIndex(['credit']),
+    account: getColIndex(['account']),
+    accountNo: getColIndex(['account no.']),
+    project: getColIndex(['project']),
+    filing: getColIndex(['filing status']),
+    submission: getColIndex(['submission status']),
+    link: getColIndex(['document link', 'gdrive']),
+    entryBy: getColIndex(['entry by'])
+  }), [headers]);
+
+  // --- Transaction Processing ---
+  const transactions = useMemo(() => {
+    if (headerRowIndex === -1) return [];
+    return data.slice(headerRowIndex + 1)
+      .filter(item => item.row.some(cell => cell !== null && cell !== ""))
+      .map(item => {
+        const val = (idx) => (idx !== -1 && idx < item.row.length) ? item.row[idx] : null;
+        return {
+          index_: item.index_,
+          no: val(colIdx.no),
+          date: val(colIdx.date),
+          entryCode: val(colIdx.entryCode),
+          type: val(colIdx.type),
+          dateIssued: val(colIdx.dateIssued),
+          description: val(colIdx.description) || 'No description',
+          invoice: val(colIdx.invoice),
+          debit: parseFloat(String(val(colIdx.debit) || 0).replace(/[₱,]/g, '')) || 0,
+          credit: parseFloat(String(val(colIdx.credit) || 0).replace(/[₱,]/g, '')) || 0,
+          account: val(colIdx.account) || 'Uncategorized',
+          accountNo: val(colIdx.accountNo),
+          project: val(colIdx.project) || 'General',
+          filing: val(colIdx.filing) || 'Pending',
+          submission: val(colIdx.submission),
+          link: val(colIdx.link),
+          entryBy: val(colIdx.entryBy),
+          raw: item.row
+        };
+      });
+  }, [data, headerRowIndex, colIdx]);
+
+  const calcTotalDebit = transactions.reduce((acc, t) => acc + t.debit, 0);
+  const calcTotalCredit = transactions.reduce((acc, t) => acc + t.credit, 0);
+  const calcBalance = calcTotalDebit - calcTotalCredit;
+
+  const projects = ['All', ...new Set(transactions.map(t => t.project).filter(Boolean))];
+  const accounts = ['All', ...new Set(transactions.map(t => t.account).filter(Boolean))];
+
+  const filteredTransactions = useMemo(() => {
+    const targetMonth = String(summary.month || '').toLowerCase().trim();
+    return transactions.filter(t => {
+      const matchesProject = filterProject === 'All' || t.project === filterProject;
+      const matchesAccount = filterAccount === 'All' || t.account === filterAccount;
+      let matchesMonth = true;
+      if (summary.month && summary.month !== 'N/A' && t.date) {
+        const parts = String(t.date).split(/[-/]/);
+        const mIdx = parts.length >= 2 ? parseInt(parts[1], 10) - 1 : new Date(t.date).getMonth();
+        matchesMonth = mIdx >= 0 && mIdx < 12 && months[mIdx].toLowerCase() === targetMonth;
+      }
+      return matchesProject && matchesAccount && matchesMonth;
+    });
+  }, [transactions, filterProject, filterAccount, summary.month, months]);
+
+  // --- Visualizations ---
+  const debitByProject = d3.rollups(transactions, v => d3.sum(v, d => d.debit), d => d.project).sort((a, b) => b[1] - a[1]);
+  const debitByAccount = d3.rollups(transactions, v => d3.sum(v, d => d.debit), d => d.account).sort((a, b) => b[1] - a[1]);
+
+  const formatCurrency = (val) => {
+    return new Intl.NumberFormat('en-PH', { 
+      style: 'currency', 
+      currency: 'PHP',
+      minimumFractionDigits: 2 
+    }).format(val);
+  };
+
+  const handleAddOrUpdate = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const row = [...(editingIndex !== null ? data.find(d => d.index_ === editingIndex).row : new Array(headers.length).fill(null))];
+    
+    if (colIdx.date !== -1) row[colIdx.date] = formData.get('date');
+    if (colIdx.entryCode !== -1) row[colIdx.entryCode] = formData.get('entryCode');
+    if (colIdx.type !== -1) row[colIdx.type] = formData.get('type');
+    if (colIdx.description !== -1) row[colIdx.description] = formData.get('description');
+    if (colIdx.dateIssued !== -1) row[colIdx.dateIssued] = formData.get('dateIssued');
+    if (colIdx.invoice !== -1) row[colIdx.invoice] = formData.get('invoice');
+    if (colIdx.debit !== -1) row[colIdx.debit] = parseFloat(formData.get('debit')) || 0;
+    if (colIdx.credit !== -1) row[colIdx.credit] = parseFloat(formData.get('credit')) || 0;
+    if (colIdx.account !== -1) row[colIdx.account] = formData.get('account');
+    if (colIdx.accountNo !== -1) row[colIdx.accountNo] = formData.get('accountNo');
+    if (colIdx.project !== -1) row[colIdx.project] = formData.get('project');
+    if (colIdx.filing !== -1) row[colIdx.filing] = formData.get('filing');
+    if (colIdx.submission !== -1) row[colIdx.submission] = formData.get('submission');
+    if (colIdx.entryBy !== -1) row[colIdx.entryBy] = formData.get('entryBy');
+
+    if (editingIndex !== null) {
+      updateItem(editingIndex, row);
+      setEditingIndex(null);
+    } else {
+      if (colIdx.no !== -1) {
+        const nextNo = transactions.length > 0 ? Math.max(...transactions.map(t => parseInt(t.no) || 0)) + 1 : 1;
+        row[colIdx.no] = nextNo;
+      }
+      insertItem(undefined, row);
+      setIsAddingEntry(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans">
+      {/* Context Ribbon */}
+      <div className="bg-slate-900 text-white px-4 md:px-8 py-2 text-[10px] flex flex-wrap items-center justify-between gap-4 border-b border-slate-800">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Calendar size={12} className="text-indigo-400" />
+            <span className="font-bold tracking-tight uppercase flex items-center gap-3">
+              Month
+              <div className="flex items-center gap-1 bg-slate-800/50 px-2 py-0.5 rounded-lg border border-slate-700/50 shadow-inner">
+                <button onClick={() => handleMonthShift(-1)} className="hover:text-indigo-400 transition-colors p-0.5 focus:outline-none">
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="min-w-[70px] text-center text-indigo-100 font-black">{summary.month}</span>
+                <button onClick={() => handleMonthShift(1)} className="hover:text-indigo-400 transition-colors p-0.5 focus:outline-none">
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <BookOpen size={12} className="text-indigo-400" />
+            <span className="font-bold tracking-tight uppercase">Status: 
+              <span className={`ml-2 px-1.5 py-0.5 rounded ${summary.status === 'ACTIVE' ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                {summary.status}
+              </span>
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-6 text-slate-400 font-bold uppercase tracking-widest">
+          <div className="flex items-center gap-1.5">
+            <Clock size={12} />
+            <span>Opened: {summary.openedOn}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <User size={12} />
+            <span>By: {summary.openedBy}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
+        <header className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+              Ledger Dashboard
+              <div className="h-6 w-[2px] bg-indigo-100 hidden sm:block"></div>
+              <span className="text-xs font-bold text-slate-400 bg-white border border-slate-100 px-3 py-1 rounded-full shadow-sm">
+                Real-time Sync
+              </span>
+            </h1>
+          </div>
+          <button 
+            onClick={() => setIsAddingEntry(true)}
+            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-indigo-100 active:scale-95"
+          >
+            <Plus size={20} strokeWidth={3} />
+            Add Transaction
+          </button>
+        </header>
+
+        {/* Top Metric Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-center mb-6">
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                <ArrowDownRight size={24} />
+              </div>
+              <span className="text-[10px] font-black text-indigo-500 bg-indigo-50/50 px-2.5 py-1 rounded-full uppercase">Monthly Inflow</span>
+            </div>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Debit</p>
+            <p className="text-2xl font-black text-slate-800">{formatCurrency(calcTotalDebit || summary.debit)}</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-center mb-6">
+              <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+                <ArrowUpRight size={24} />
+              </div>
+              <span className="text-[10px] font-black text-rose-500 bg-rose-50/50 px-2.5 py-1 rounded-full uppercase">Monthly Outflow</span>
+            </div>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Credit</p>
+            <p className="text-2xl font-black text-slate-800">{formatCurrency(calcTotalCredit || summary.credit)}</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-center mb-6">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+                <DollarSign size={24} />
+              </div>
+              <span className="text-[10px] font-black text-emerald-500 bg-emerald-50/50 px-2.5 py-1 rounded-full uppercase">Current Balance</span>
+            </div>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Net Position</p>
+            <p className={`text-2xl font-black ${calcBalance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+              {formatCurrency(calcBalance)}
+            </p>
+          </div>
+
+          <div className="bg-slate-900 p-6 rounded-3xl shadow-xl text-white">
+            <div className="flex justify-between items-center mb-6">
+              <div className="p-3 bg-white/10 text-indigo-400 rounded-2xl">
+                <Layers size={24} />
+              </div>
+              <span className="text-[10px] font-black text-indigo-300 bg-white/5 px-2.5 py-1 rounded-full uppercase">Record Count</span>
+            </div>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Entries</p>
+            <p className="text-2xl font-black">{transactions.length} Transactions</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Charts Panel */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-2 bg-indigo-50 text-indigo-500 rounded-lg">
+                  <BarChart3 size={18} />
+                </div>
+                <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Project Distribution</h3>
+              </div>
+              <div className="space-y-6">
+                {debitByProject.map(([name, value], i) => (
+                  <div key={name || i}>
+                    <div className="flex justify-between text-[11px] mb-2">
+                      <span className="font-black text-slate-500 truncate uppercase tracking-tight">{name || 'General'}</span>
+                      <span className="font-black text-slate-900">{formatCurrency(value)}</span>
+                    </div>
+                    <div className="w-full bg-slate-50 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out" 
+                        style={{ width: `${(value / (calcTotalDebit || 1)) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-2 bg-amber-50 text-amber-500 rounded-lg">
+                  <PieChart size={18} />
+                </div>
+                <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Account Breakdown</h3>
+              </div>
+              <div className="space-y-3">
+                {debitByAccount.map(([name, value], i) => (
+                  <div key={name || i} className="flex items-center justify-between p-3.5 bg-slate-50/50 rounded-2xl hover:bg-slate-50 transition-colors group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d3.schemeTableau10[i % 10] }} />
+                      <span className="text-[11px] font-black text-slate-600 truncate uppercase tracking-tight">{name || 'Uncategorized'}</span>
+                    </div>
+                    <span className="text-[11px] font-black text-slate-400 group-hover:text-indigo-600 transition-colors">
+                      {Math.round((value / (calcTotalDebit || 1)) * 100)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Transactions Table Panel */}
+          <div className="lg:col-span-8">
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col min-h-[600px]">
+              <div className="p-6 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                    <select 
+                      className="pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-black text-slate-600 outline-none focus:ring-2 focus:ring-indigo-100 appearance-none cursor-pointer"
+                      value={filterProject}
+                      onChange={(e) => setFilterProject(e.target.value)}
+                    >
+                      <option value="All">All Projects</option>
+                      {projects.filter(p => p !== 'All').map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div className="relative">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                    <select 
+                      className="pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-black text-slate-600 outline-none focus:ring-2 focus:ring-indigo-100 appearance-none cursor-pointer"
+                      value={filterAccount}
+                      onChange={(e) => setFilterAccount(e.target.value)}
+                    >
+                      <option value="All">All Accounts</option>
+                      {accounts.filter(a => a !== 'All').map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                  Showing {filteredTransactions.length} items
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto">
+                <table className="w-full text-left border-collapse min-w-[900px]">
+                  <thead className="sticky top-0 bg-white/95 backdrop-blur z-20">
+                    <tr className="border-b border-slate-100 text-[10px] uppercase tracking-widest text-slate-400 font-black">
+                      <th className="px-6 py-4 w-12 text-center">#</th>
+                      <th className="px-6 py-4">Detailed Description</th>
+                      <th className="px-6 py-4">Reference</th>
+                      <th className="px-6 py-4">Categorization</th>
+                      <th className="px-6 py-4 text-right">Debit</th>
+                      <th className="px-6 py-4 text-right">Credit</th>
+                      <th className="px-6 py-4 text-center">Status</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filteredTransactions.map((t) => (
+                      <tr key={t.index_} className="group hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-5 text-center font-mono text-[11px] text-slate-300 group-hover:text-slate-400">
+                          {t.no ? String(t.no).padStart(2, '0') : '--'}
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors max-w-xs truncate">
+                            {t.description}
+                          </div>
+                          <div className="flex items-center gap-2.5 mt-1.5">
+                            <Calendar size={10} className="text-slate-300" />
+                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-tight">{t.date || 'UNSET'}</span>
+                            {t.entryBy && (
+                              <>
+                                <div className="h-2 w-[1px] bg-slate-200"></div>
+                                <span className="text-[9px] text-slate-400 font-bold">By: {t.entryBy}</span>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="flex flex-col gap-1">
+                            {t.invoice && (
+                              <div className="flex items-center gap-1.5 text-[10px] font-black text-indigo-500 bg-indigo-50 w-fit px-1.5 py-0.5 rounded uppercase">
+                                <Hash size={10} /> {t.invoice}
+                              </div>
+                            )}
+                            {t.entryCode && (
+                              <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">
+                                Code: {t.entryCode}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-700 uppercase mb-1">
+                            <Tag size={10} className="text-slate-300" /> {t.project}
+                          </div>
+                          <div className="text-[10px] font-bold text-slate-400 pl-4">
+                            {t.account} {t.accountNo && `(${t.accountNo})`}
+                          </div>
+                        </td>
+                        <td className="px-6 py-5 text-right font-mono text-xs font-black text-slate-900">
+                          {t.debit > 0 ? formatCurrency(t.debit) : '—'}
+                        </td>
+                        <td className="px-6 py-5 text-right font-mono text-xs font-black text-rose-500">
+                          {t.credit > 0 ? formatCurrency(t.credit) : '—'}
+                        </td>
+                        <td className="px-6 py-5 text-center space-y-1">
+                          <span className={`block w-full text-center px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-tighter border ${
+                            t.filing?.toLowerCase().includes('filed') || t.filing?.toLowerCase().includes('done')
+                              ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                              : t.filing?.toLowerCase().includes('active') 
+                                ? 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                                : 'bg-amber-50 text-amber-600 border-amber-100'
+                          }`}>
+                            {t.filing}
+                          </span>
+                          {t.submission && (
+                            <span className={`block w-full text-center px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-tighter border ${
+                              t.submission?.toLowerCase().includes('submitted') || t.submission?.toLowerCase().includes('done')
+                                ? 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                                : 'bg-slate-50 text-slate-400 border-slate-100'
+                            }`}>
+                              S: {t.submission}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-5 text-right">
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                            {t.link && (
+                              <button 
+                                onClick={() => followLink(t.link)}
+                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"
+                                title="Open Link"
+                              >
+                                <ExternalLink size={14} />
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => setEditingIndex(t.index_)}
+                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"
+                              title="Edit Entry"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button 
+                              onClick={() => deleteItem(t.index_)}
+                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredTransactions.length === 0 && (
+                      <tr>
+                        <td colSpan="8" className="px-6 py-24 text-center">
+                          <div className="flex flex-col items-center gap-4 opacity-20">
+                            <Layers size={64} strokeWidth={1} />
+                            <p className="text-xl font-black uppercase tracking-widest text-slate-800">Empty Ledger</p>
+                            <p className="text-sm font-medium text-slate-500">No transactions match your current selection.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add/Edit Modal */}
+      {(isAddingEntry || editingIndex !== null) && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
+          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col animate-in fade-in zoom-in duration-200">
+            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0">
+              <div>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight">
+                  {editingIndex !== null ? 'Update Record' : 'Register Transaction'}
+                </h2>
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Audit Log Modification</p>
+              </div>
+              <button 
+                onClick={() => { setIsAddingEntry(false); setEditingIndex(null); }}
+                className="text-slate-400 hover:text-slate-600 p-3 bg-white rounded-full shadow-sm hover:shadow transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAddOrUpdate} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-10 space-y-8 overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Transaction Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input 
+                      name="date" 
+                      type="date" 
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700"
+                      defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.date : ''}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Reference Code</label>
+                  <div className="relative">
+                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input 
+                      name="entryCode" 
+                      placeholder="TRX-000"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700 uppercase"
+                      defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.entryCode : ''}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Type / Category</label>
+                  <select 
+                    name="type" 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700 cursor-pointer"
+                    defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.type : ''}
+                  >
+                    <option value="">Select Type...</option>
+                    {['Income', 'Subsidy', 'Expenditure'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date Issued</label>
+                  <input 
+                    name="dateIssued" 
+                    type="date"
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700"
+                    defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.dateIssued : ''}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Invoice / Document No.</label>
+                <div className="relative">
+                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    name="invoice" 
+                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700"
+                    placeholder="Invoice or Receipt #"
+                    defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.invoice : ''}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Official Description</label>
+                <div className="relative">
+                  <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    name="description" 
+                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700"
+                    placeholder="Enter purpose or memo..."
+                    required
+                    defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.description : ''}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">Debit (+) Inflow</label>
+                  <div className="relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-emerald-500">₱</div>
+                    <input 
+                      name="debit" 
+                      type="number" 
+                      step="0.01" 
+                      className="w-full pl-10 pr-4 py-4 bg-emerald-50/30 border border-emerald-100 rounded-2xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all font-black text-emerald-900"
+                      defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.debit : 0}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">Credit (-) Outflow</label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-rose-500">₱</div>
+                    <input 
+                      name="credit" 
+                      type="number" 
+                      step="0.01" 
+                      className="w-full pl-10 pr-4 py-4 bg-rose-50/30 border border-rose-100 rounded-2xl focus:ring-4 focus:ring-rose-100 focus:border-rose-400 outline-none transition-all font-black text-rose-900"
+                      defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.credit : 0}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Project ID</label>
+                  <input 
+                    name="project" 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700"
+                    list="projects-list"
+                    placeholder="Select Project..."
+                    defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.project : ''}
+                  />
+                  <datalist id="projects-list">
+                    {projects.filter(p => p !== 'All').map(p => <option key={p} value={p} />)}
+                  </datalist>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account Category</label>
+                  <select 
+                    name="account" 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700 cursor-pointer"
+                    defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.account : ''}
+                  >
+                    <option value="">Select Account...</option>
+                    {['SACEV', 'PTA', 'Others'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account No.</label>
+                  <input 
+                    name="accountNo" 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700"
+                    placeholder="e.g. 1234-5678"
+                    defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.accountNo : ''}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Submission Status</label>
+                  <select 
+                    name="submission" 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700 cursor-pointer"
+                    defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.submission : 'Pending'}
+                  >
+                    <option>Pending</option>
+                    <option>Submitted</option>
+                    <option>Revised</option>
+                    <option>Approved</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Entry By</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    name="entryBy" 
+                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-black text-slate-700"
+                    placeholder="Staff Name"
+                    defaultValue={editingIndex !== null ? transactions.find(t => t.index_ === editingIndex)?.entryBy : ''}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-8 border-t border-slate-50 bg-slate-50/50 flex gap-4 shrink-0">
+              <button 
+                type="button"
+                onClick={() => { setIsAddingEntry(false); setEditingIndex(null); }}
+                className="flex-1 py-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-black rounded-3xl transition-all uppercase tracking-widest text-[11px]"
+              >
+                Discard Changes
+              </button>
+              <button 
+                type="submit"
+                className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-3xl shadow-2xl shadow-indigo-200 transition-all uppercase tracking-widest text-[11px] active:scale-95"
+              >
+                {editingIndex !== null ? 'Confirm Update' : 'Finalize Entry'}
+              </button>
+            </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+/* canvas_id:814286469 */
+/* canvas_id:1681636155 */
